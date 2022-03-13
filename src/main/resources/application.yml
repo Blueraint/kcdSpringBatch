@@ -1,0 +1,39 @@
+server:
+  port: 8080
+  tomcat:
+    uri-encoding: UTF-8
+
+spring:
+  profiles:
+    active: database_dev
+  thymeleaf:
+    prefix: classpath:templates/
+    suffix: .html
+    check-template: true
+    cache: false
+    check-template-location: true
+    mode: HTML5
+  http:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+# properties for swagger2(v3.0.0)
+  mvc:
+    pathmatch:
+      matching-strategy: ANT_PATH_MATCHER
+
+  batch:
+    job:
+      enabled: false
+      names: ${job.name:NONE}
+
+logging:
+  level:
+    root: INFO
+    org.hibernate.SQL: off
+    org.hibernate.type: off
+#    com.springboot.springsecurity: debug
+#    org.hibernate.SQL: debug
+    # print query parameter operate jpa query
+#    org.hibernate.type: trace

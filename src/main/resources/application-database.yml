@@ -1,0 +1,50 @@
+spring:
+  creditinfo:
+    datasource:
+      driver-class-name: com.mysql.cj.jdbc.Driver
+      jdbc-url: "jdbc:mysql://localhost:3306/creditinfotest"
+      username: "creditinfo"
+      password: "creditinfo"
+      hikari:
+        connection-timeout: 5000
+        validation-timeout: 1000
+        minimum-idle: 5
+        max-lifetime: 2400000
+        maximum-pool-size: 20
+  springbatch:
+    datasource:
+      driver-class-name: com.mysql.cj.jdbc.Driver
+      jdbc-url: "jdbc:mysql://localhost:3306/batchtest"
+      username: "batchdev"
+      password: "batchdev"
+      hikari:
+        connection-timeout: 5000
+        validation-timeout: 1000
+        minimum-idle: 5
+        max-lifetime: 2400000
+        maximum-pool-size: 20
+#  jpa:
+#    hibernate:
+#      ddl-auto: none
+#    properties:
+#      hibernate:
+#        format_sql: true
+#        default_batch_fetch_size: 100
+#        dialect: org.hibernate.dialect.H2Dialect
+#       show_sql option is print sql using system.out
+#       show_sql: true
+
+# Spring quartz
+  quartz:
+    jdbc:
+      initialize-schema: ALWAYS
+      schema: classpath:/sql/tables_mysql.sql
+    scheduler-name: batchScheduler
+    job-store-type: JDBC
+    overwrite-existing-jobs: true
+
+#p6spy jpa logging level
+decorator:
+  datasource:
+    p6spy:
+      enable-logging: false
