@@ -33,4 +33,6 @@ public interface BatchJobExecutionRepository extends ReadOnlyRepository<BatchJob
     @EntityGraph(attributePaths = {"batchJobInstance", "batchJobExecutionParamsList"})
     List<BatchJobExecution> findByCreateTimeBetweenAndBatchJobExecutionParamsListKeyNameAndBatchJobExecutionParamsListStringVal(LocalDateTime start, LocalDateTime end, String keyName, String stringVal);
 
+    @EntityGraph(attributePaths = {"batchJobInstance", "batchJobExecutionParamsList"})
+    List<BatchJobExecution> findByStatusAndExitCodeAndBatchJobExecutionParamsListStringVal(String status, String exitCode, String keyName, String stringVal);
 }

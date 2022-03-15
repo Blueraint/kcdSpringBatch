@@ -12,5 +12,5 @@ public interface BatchJobService {
     List<BatchJobExecutionDto> findBatchStatus(SearchParam searchParam);
     Page<BatchJobExecutionDto> findAllStatus(Pageable pageable);
     List<String> findBatchList();
-
+    List<BatchJobExecutionDto> findBatchStatusSearchByStatusAndExitCode(SearchParam searchParam);
 }

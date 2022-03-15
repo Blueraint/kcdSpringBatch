@@ -27,6 +27,7 @@ spring:
     job:
       enabled: false
       names: ${job.name:NONE}
+      chunkSize: 100
 
 logging:
   level:

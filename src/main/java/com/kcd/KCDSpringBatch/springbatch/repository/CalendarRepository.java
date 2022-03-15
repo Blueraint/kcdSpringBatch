@@ -1,7 +1,7 @@
 package com.kcd.KCDSpringBatch.springbatch.repository;
 
 import com.kcd.KCDSpringBatch.springbatch.domain.BatchJobExecution;
-import com.kcd.KCDSpringBatch.springbatch.domain.Calendar;
+import com.kcd.KCDSpringBatch.quartz.domain.Calendar;
 import org.springframework.data.jpa.repository.Query;
 
 import java.util.List;

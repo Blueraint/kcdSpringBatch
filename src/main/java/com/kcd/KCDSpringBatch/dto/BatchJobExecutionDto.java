@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 @ToString
 @NoArgsConstructor
 public class BatchJobExecutionDto {
+    private Long id;
     private String jobName;
     private LocalDateTime createTime;
     private LocalDateTime startTime;

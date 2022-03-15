@@ -16,6 +16,7 @@ import org.springframework.batch.item.file.mapping.BeanWrapperFieldSetMapper;
 import org.springframework.batch.item.file.mapping.DefaultLineMapper;
 import org.springframework.batch.item.file.transform.DelimitedLineTokenizer;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
@@ -41,15 +42,12 @@ public class InitializationJobConfig {
 //    @Qualifier("creditinfoEntityManagerFactory")
     private final EntityManagerFactory creditinfoEntityManagerFactory;
 
-    @Resource(name = "springbatchEntityManagerFactory")
-//    @Qualifier("springbatchEntityManagerFactory")
-    private final EntityManagerFactory springbatchEntityManagerFactory;
-
     @Qualifier("creditinfoTransactionManager")
     private final PlatformTransactionManager creditinfoTransactionManager;
 
     // 단일 Thread 에서는 chunksize 를 늘린다고 해서 속도가 비약적으로 상승하지 않는다.
-    private final int chunkSize = 1000;
+    @Value("${spring.batch.job.chunkSize}")
+    private int chunkSize;
 
     private String firmCode;
 

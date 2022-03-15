@@ -56,4 +56,15 @@ public class BatchJobServiceImpl implements BatchJobService {
     public List<String> findBatchList() {
         return jobExplorer.getJobNames();
     }
+
+    @Override
+    public List<BatchJobExecutionDto> findBatchStatusSearchByStatusAndExitCode(SearchParam searchParam) {
+        List<BatchJobExecutionDto> batchJobExecutionDtoList = new ArrayList<>();
+        List<BatchJobExecution> batchJobExecutionList =
+                batchJobExecutionRepository.findByStatusAndExitCodeAndBatchJobExecutionParamsListStringVal(searchParam.getStatus(), searchParam.getExitCode(), "firmCode", searchParam.getFirmCode());
+
+        batchJobExecutionList.forEach(i -> batchJobExecutionDtoList.add(BatchJobExecutionMapper.INSTANCE.entityToDto(i)));
+
+        return batchJobExecutionDtoList;
+    }
 }

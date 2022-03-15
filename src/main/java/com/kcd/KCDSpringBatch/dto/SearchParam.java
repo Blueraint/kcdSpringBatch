@@ -18,7 +18,7 @@ public class SearchParam {
     @ApiModelProperty(value = "기업고유번호", dataType = "String", example = "0001", required = true)
     private String firmCode;
 
-    @ApiModelProperty(value = "추출타입", dataType = "csv/fixed/json", example = "csv",required = true)
+    @ApiModelProperty(value = "추출타입", dataType = "csv/fixed/json", example = "csv")
     private String fileType;
 
     @ApiModelProperty(value = "시작일자", dataType = "Date", example = "2020-01-01T19:00:00")
@@ -26,4 +26,10 @@ public class SearchParam {
 
     @ApiModelProperty(value = "종료일자", dataType = "Date", example = "2020-01-01T19:00:00")
     private LocalDateTime endDate;
+
+    @ApiModelProperty(value = "배치상태코드", dataType = "String", example = "COMPLETED")
+    private String status;
+
+    @ApiModelProperty(value = "종료상태코드", dataType = "String", example = "COMPLETED")
+    private String exitCode;
 }

@@ -1,22 +1,15 @@
 package com.kcd.KCDSpringBatch.config;
 
-import com.kcd.KCDSpringBatch.springbatch.domain.Calendar;
 import com.kcd.KCDSpringBatch.springbatch.repository.CalendarRepository;
 import lombok.RequiredArgsConstructor;
-import org.quartz.Scheduler;
 import org.quartz.impl.calendar.HolidayCalendar;
-import org.springframework.boot.sql.init.dependency.DependsOnDatabaseInitialization;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Conditional;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.stereotype.Component;
 
 import java.sql.Date;
-import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.Month;
-import java.util.List;
 
 @Component
 @RequiredArgsConstructor

@@ -70,12 +70,12 @@ public class RepositoryTest {
     @Transactional
     public void firmRepositoryTest() {
         Firm firm = new Firm();
-        firm.setFirmCode("0001");
+        firm.setFirmCode("0004");
 
         firmRepository.save(firm);
 
         List<FirmCustomer> firmCustomers = new ArrayList<>();
-        List<Customer> customerList = customerRepository.findAll(PageRequest.of(0,20)).getContent();
+        List<Customer> customerList = customerRepository.findAll(PageRequest.of(0,1000)).getContent();
 
         customerList.forEach(customer -> {
             FirmCustomer firmCustomer = new FirmCustomer();

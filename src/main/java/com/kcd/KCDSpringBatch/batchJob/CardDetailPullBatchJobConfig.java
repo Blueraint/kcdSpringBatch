@@ -13,8 +13,13 @@ import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.core.job.flow.FlowExecutionStatus;
 import org.springframework.batch.core.job.flow.JobExecutionDecider;
 import org.springframework.batch.item.ItemProcessor;
+import org.springframework.batch.item.database.JdbcPagingItemReader;
 import org.springframework.batch.item.database.JpaPagingItemReader;
+import org.springframework.batch.item.database.Order;
+import org.springframework.batch.item.database.PagingQueryProvider;
+import org.springframework.batch.item.database.builder.JdbcPagingItemReaderBuilder;
 import org.springframework.batch.item.database.builder.JpaPagingItemReaderBuilder;
+import org.springframework.batch.item.database.support.SqlPagingQueryProviderFactoryBean;
 import org.springframework.batch.item.file.FlatFileItemWriter;
 import org.springframework.batch.item.file.builder.FlatFileItemWriterBuilder;
 import org.springframework.batch.item.file.transform.BeanWrapperFieldExtractor;
@@ -28,10 +33,17 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.task.TaskExecutor;
+import org.springframework.jdbc.core.BeanPropertyRowMapper;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import javax.persistence.EntityManagerFactory;
+import javax.sql.DataSource;
 import java.io.File;
 import java.lang.reflect.Field;
 import java.util.Arrays;
@@ -50,11 +62,14 @@ public class CardDetailPullBatchJobConfig {
 //    @Qualifier("creditinfoEntityManagerFactory")
     private final EntityManagerFactory creditinfoEntityManagerFactory;
 
-    @Resource(name = "springbatchEntityManagerFactory")
-//    @Qualifier("springbatchEntityManagerFactory")
-    private final EntityManagerFactory springbatchEntityManagerFactory;
+    @Resource(name = "creditinfoTransactionManager")
+    private final PlatformTransactionManager creditinfoTransactionManager;
 
-    private final int chunkSize = 100;
+    @Resource(name = "creditinfoDataSource")
+    private final DataSource creditinfoDataSource;
+
+    @Value("${spring.batch.job.chunkSize}")
+    private int chunkSize;
 
     /*
      * Definition Job
@@ -62,7 +77,7 @@ public class CardDetailPullBatchJobConfig {
 
     @Bean
     @Qualifier("cardDetailPullBatchJob")
-    public Job cardDetailPullBatchJob() {
+    public Job cardDetailPullBatchJob() throws Exception {
         return jobBuilderFactory.get("cardDetailPullBatchJob")
                 .start(startStep()) // .jobBuilder.start(Step) create SimpleJobBuilder
                 .next(fileTypeDecider())
@@ -121,35 +136,57 @@ public class CardDetailPullBatchJobConfig {
     }
 
     @Bean
-    public Step cardDetailInfoCreateCsvStep() {
+    @Transactional
+    public Step cardDetailInfoCreateCsvStep() throws Exception {
         return stepBuilderFactory.get("cardDetailInfoCreateCsvStep")
                 .<CardDetailInfo, CardDetailInfoOutputDto>chunk(chunkSize)
-                .reader(cardDetailInfoJpaPagingItemReader(null))
+//                .reader(cardDetailInfoJpaPagingItemReader(null))
+                .reader(cardDetailInfoJdbcPagingItemReader(null))
                 .processor(CardDetailInfoOutputDtoProcessor())
-                .writer(cardDetailInfoOutputDtoCsvItemWriter(null))
+                .writer(cardDetailInfoOutputDtoCsvItemWriter(null, null))
+                .taskExecutor(cardDetailPullTaskExecutor())
+                .transactionManager(creditinfoTransactionManager)
                 .build();
     }
 
     @Bean
+    @Transactional
     public Step cardDetailInfoCreateFixedLengthStep() {
         return stepBuilderFactory.get("cardDetailInfoCreateFixedLengthStep")
                 .<CardDetailInfo, CardDetailInfoOutputDto>chunk(chunkSize)
                 .reader(cardDetailInfoJpaPagingItemReader(null))
                 .processor(CardDetailInfoOutputDtoProcessor())
-                .writer(cardDetailInfoOutputDtoFixedLengthFileItemWriter(null))
+                .writer(cardDetailInfoOutputDtoFixedLengthFileItemWriter(null, null))
+                .taskExecutor(cardDetailPullTaskExecutor())
+                .transactionManager(creditinfoTransactionManager)
                 .build();
     }
 
     @Bean
+    @Transactional
     public Step cardDetailInfoCreateJsonStep() {
         return stepBuilderFactory.get("cardDetailInfoCreateJsonStep")
                 .<CardDetailInfo, CardDetailInfoOutputDto>chunk(chunkSize)
                 .reader(cardDetailInfoJpaPagingItemReader(null))
                 .processor(CardDetailInfoOutputDtoProcessor())
-                .writer(cardDetailInfoOutputDtoJsonFileItemWriter(null))
+                .writer(cardDetailInfoOutputDtoJsonFileItemWriter(null, null))
+                .taskExecutor(cardDetailPullTaskExecutor())
+                .transactionManager(creditinfoTransactionManager)
                 .build();
     }
 
+    @Bean
+    public TaskExecutor cardDetailPullTaskExecutor() {
+        ThreadPoolTaskExecutor threadPoolTaskExecutor = new ThreadPoolTaskExecutor();
+        // base size
+        threadPoolTaskExecutor.setCorePoolSize(4);
+        // max size
+        threadPoolTaskExecutor.setMaxPoolSize(4);
+        threadPoolTaskExecutor.setThreadNamePrefix("cardDetailPull_async_thread");
+        threadPoolTaskExecutor.initialize();
+
+        return threadPoolTaskExecutor;
+    }
 
     /*
      * Definition ItemReader
@@ -170,15 +207,58 @@ public class CardDetailPullBatchJobConfig {
         return new JpaPagingItemReaderBuilder<CardDetailInfo>()
                 .name("cardDetailInfoJpaPagingItemReader")
                 .entityManagerFactory(creditinfoEntityManagerFactory)
-                .pageSize(chunkSize)
+                .pageSize(chunkSize) // pageSize = chunkSize
 //              WARN) 모든 데이터를 다 가져와서 페이징한다 -> firm 에 해당하는 customer 만 가져와서 in절로 가져와야 메모리 낭비를 해결할 수 있다
-                .queryString("select i from CardDetailInfo i left join fetch i.customer c "+
-                            "left join fetch c.firmCustomers fc  " +
-                            "left join fetch fc.firm f " +
+                .queryString("select i from CardDetailInfo i left join i.customer c "+
+                            "left join c.firmCustomers fc  " +
+                            "left join fc.firm f " +
                             "where f.firmCode = :firmCode " +
                             "order by i.id asc")
                 .parameterValues(queryParameters)
+                .saveState(false)
                 .build();
+    }
+
+    @Bean
+    @StepScope
+    @DependsOn(value = "creditinfoDataSource")
+    public JdbcPagingItemReader<CardDetailInfo> cardDetailInfoJdbcPagingItemReader(@Value("#{jobParameters[firmCode]}") String firmCode) throws Exception {
+        log.debug("### Param(firmCode) : " + firmCode);
+        Map<String, Object> queryParameters = new HashMap<>();
+        queryParameters.put("firmCode",firmCode);
+
+        return new JdbcPagingItemReaderBuilder<CardDetailInfo>()
+                .name("cardDetailInfoJdbcPagingItemReader")
+                .pageSize(chunkSize) // pageSize = chunkSize
+                .fetchSize(chunkSize)
+                .dataSource(creditinfoDataSource)
+                .rowMapper(new BeanPropertyRowMapper<>(CardDetailInfo.class))
+                .queryProvider(cardDetailInfoQueryProvider())
+                .parameterValues(queryParameters)
+                .saveState(false)
+                .build();
+    }
+
+    @Bean
+    public PagingQueryProvider cardDetailInfoQueryProvider() throws Exception {
+        SqlPagingQueryProviderFactoryBean queryProvider = new SqlPagingQueryProviderFactoryBean();
+        queryProvider.setDataSource(creditinfoDataSource);
+
+        String selectStr = "select cd.card_detail_id, cd.amtAnnuity, cd.amtCredit, cd.amtGoodsPrice, cd.amtIncomeTotal, cd.cntChildren, cd.cntFamMembers, cd.customer_id, cd.daysBirth, cd.daysEmployed, cd.daysIdPublish, cd.daysRegistration, cd.flagContMobile, cd.flagEmail, cd.flagEmpPhone, " +
+                " cd.flagMobil, cd.flagOwnCar, cd.flagOwnRealty, cd.flagPhone, cd.flagWorkPhone, cd.hourApprProcessStart, cd.liveCityNotWorkCity, cd.liveRegionNotWorkRegion, cd.nameContractType, cd.nameEducationType, cd.nameFamilyStatus, cd.nameHousingType, cd.nameIncomeType, " +
+                " cd.nameTypeSuite, cd.occupationType, cd.organizationType, cd.ownCarAge, cd.regCityNotLiveCity, cd.regCityNotWorkCity, cd.regRegionNotLiveRegion, cd.regRegionNotWorkRegion, cd.regionPopulationRelative, cd.regionRatingClient, cd.regionRatingClientWCity, cd.target,cd.weekdayApprProcessStart";
+        String fromStr = "from CARD_DETAIL_INFO cd left outer join CUSTOMER cus on cd.customer_id=cus.customer_id left outer join FIRM_CUSTOMER fs on cus.customer_id=fs.customer_id left outer join FIRM fi on fs.firm_id=fi.firm_id";
+
+        queryProvider.setSelectClause(selectStr);
+        queryProvider.setFromClause(fromStr);
+        queryProvider.setWhereClause("where fi.firmCode = :firmCode");
+
+        Map<String, Order> sortKeys = new HashMap<>();
+        sortKeys.put("cd.card_detail_id", Order.ASCENDING);
+
+        queryProvider.setSortKeys(sortKeys);
+
+        return queryProvider.getObject();
     }
 
     /*
@@ -202,7 +282,7 @@ public class CardDetailPullBatchJobConfig {
     /* specific*/
     @Bean
     @StepScope
-    public FlatFileItemWriter<CardDetailInfoOutputDto> cardDetailInfoOutputDtoCsvItemWriter(@Value("#{jobExecutionContext['jobName']}") String jobName) {
+    public FlatFileItemWriter<CardDetailInfoOutputDto> cardDetailInfoOutputDtoCsvItemWriter(@Value("#{jobExecutionContext['jobName']}") String jobName, @Value("#{jobParameters[firmCode]}") String firmCode) {
         // file writer using customized fieldExtractor(implements or extends)
         MyBeanWrapperFieldExtractor<CardDetailInfoOutputDto> myBeanWrapperFieldExtractor = new MyBeanWrapperFieldExtractor<>();
         myBeanWrapperFieldExtractor.setNames(Arrays.stream(CardDetailInfoOutputDto.class.getDeclaredFields()).map(Field::getName).toArray(String[]::new));
@@ -214,7 +294,7 @@ public class CardDetailPullBatchJobConfig {
         delimitedLineAggregator.setFieldExtractor(myBeanWrapperFieldExtractor);
 
         return new FlatFileItemWriterBuilder<CardDetailInfoOutputDto>().name("cardDetailInfoOutputDtoItemWriter")
-                .resource(new FileSystemResource("output" + File.separator + jobName + "_data_output.csv"))
+                .resource(new FileSystemResource("output" + File.separator + firmCode + "_" + jobName + "_data_output.csv"))
                 .lineAggregator(delimitedLineAggregator)
                 .build();
     }
@@ -243,7 +323,7 @@ public class CardDetailPullBatchJobConfig {
     /* FixedLength Type */
     @Bean
     @StepScope
-    public FlatFileItemWriter<CardDetailInfoOutputDto> cardDetailInfoOutputDtoFixedLengthFileItemWriter(@Value("#{jobExecutionContext['jobName']}") String jobName) {
+    public FlatFileItemWriter<CardDetailInfoOutputDto> cardDetailInfoOutputDtoFixedLengthFileItemWriter(@Value("#{jobExecutionContext['jobName']}") String jobName, @Value("#{jobParameters[firmCode]}") String firmCode) {
         BeanWrapperFieldExtractor<CardDetailInfoOutputDto> beanWrapperFieldExtractor = new BeanWrapperFieldExtractor<>();
         beanWrapperFieldExtractor.setNames(Arrays.stream(CardDetailInfoOutputDto.class.getDeclaredFields()).map(Field::getName).toArray(String[]::new));
         beanWrapperFieldExtractor.afterPropertiesSet();
@@ -262,7 +342,7 @@ public class CardDetailPullBatchJobConfig {
         lineAggregator.setFieldExtractor(beanWrapperFieldExtractor);
 
         return new FlatFileItemWriterBuilder<CardDetailInfoOutputDto>().name("cardDetailInfoOutputDtoFixedLengthFileItemWriter")
-                .resource(new FileSystemResource("output" + File.separator + jobName + "_data_output.txt"))
+                .resource(new FileSystemResource("output" + File.separator + firmCode + "_" + jobName + "_data_output.txt"))
                 .formatted()
                 .names()
                 .lineAggregator(lineAggregator)
@@ -272,11 +352,11 @@ public class CardDetailPullBatchJobConfig {
     /* Json Type */
     @Bean
     @StepScope
-    public JsonFileItemWriter<CardDetailInfoOutputDto> cardDetailInfoOutputDtoJsonFileItemWriter(@Value("#{jobExecutionContext['jobName']}") String jobName) {
+    public JsonFileItemWriter<CardDetailInfoOutputDto> cardDetailInfoOutputDtoJsonFileItemWriter(@Value("#{jobExecutionContext['jobName']}") String jobName, @Value("#{jobParameters[firmCode]}") String firmCode) {
         return new JsonFileItemWriterBuilder<CardDetailInfoOutputDto>()
                 .name("cardDetailInfoOutputDtoJsonFileItemWriter")
                 .jsonObjectMarshaller(new JacksonJsonObjectMarshaller<>()) // object 를  json 으로 돌려주는 변환기 (marshaller) 생성
-                .resource(new FileSystemResource("output" + File.separator + jobName + "_data_output.json"))
+                .resource(new FileSystemResource("output" + File.separator + firmCode + "_" + jobName + "_data_output.json"))
                 .build();
     }
 }

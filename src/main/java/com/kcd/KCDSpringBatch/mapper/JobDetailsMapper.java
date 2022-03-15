@@ -5,14 +5,14 @@ import com.kcd.KCDSpringBatch.quartz.domain.JobDetails;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.Named;
+import org.mapstruct.ReportingPolicy;
 import org.mapstruct.factory.Mappers;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.util.Optional;
 import java.util.TimeZone;
 
-@Mapper
+@Mapper(unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface JobDetailsMapper {
     JobDetailsMapper INSTANCE = Mappers.getMapper(JobDetailsMapper.class);
 
@@ -32,13 +32,13 @@ public interface JobDetailsMapper {
      */
     @Named("transferStringToLocalDate")
     static LocalDateTime transferStringToLocalDate(String timeStr) {
-        Long time = Long.parseLong(timeStr);
+        long time = Long.parseLong(timeStr);
 
         return ("0".equals(timeStr))? null : LocalDateTime.ofInstant(Instant.ofEpochMilli(time), TimeZone.getDefault().toZoneId());
     }
 
     @Named("setCalendarFunction")
     static boolean setCalendarFunction(String calendarName) {
-        return (calendarName != null) ? true : false;
+        return calendarName != null;
     }
 }

@@ -6,10 +6,10 @@ import com.kcd.KCDSpringBatch.dto.CardDetailInfoInputDto;
 import com.kcd.KCDSpringBatch.dto.CardDetailInfoOutputDto;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.mapstruct.ReportingPolicy;
 import org.mapstruct.factory.Mappers;
 
-@Mapper
-//        (componentModel = "spring")
+@Mapper(unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface CardDetailInfoMapper {
     CardDetailInfoMapper INSTANCE = Mappers.getMapper(CardDetailInfoMapper.class);
 

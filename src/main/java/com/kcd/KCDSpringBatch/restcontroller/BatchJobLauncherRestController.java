@@ -43,16 +43,29 @@ public class BatchJobLauncherRestController {
 
     /*
      * 표준화된 배치를 실행하기 위해서 Controller 를 표준화함
-     * Server to Server 통신 표준화
      */
     @ApiOperation(value = "배치 잡 실행을 위한 공통 API", notes = "JOB 기반 배치를 확인하기 위한 API. Bean 상태로 등록된 배치 잡만 돌릴 수 있으며, batchJob Package 에서 확인 가능")
     @ApiResponses({
             @ApiResponse(code = 200, message = "API가 정상적으로 Batch Job을 Call 하였음. 이후 상태는 Batch Metadata에서 확인 가능."),
             @ApiResponse(code = 500, message = "Server Error.")
     })
-
     @PostMapping("/run/{jobName}")
     public GlobalMessageDto batchCaller(@PathVariable("jobName") String jobName, @Valid @RequestBody BatchParam batchParam) {
+        // Validation Job
+        if(!jobExplorer.getJobNames().contains(jobName)) return new GlobalMessageDto(false, "JOB_NAME[" + jobName + "] Not Found.");
+
+        generalBatchLaunchService.runJob(jobName,batchParam);
+
+        return new GlobalMessageDto(true, jobName + " called");
+    }
+
+    @ApiOperation(value = "배치 잡 정지 API", notes = "JOB 기반 배치를 확인하기 위한 API. Bean 상태로 등록된 배치 잡만 돌릴 수 있으며, batchJob Package 에서 확인 가능")
+    @ApiResponses({
+            @ApiResponse(code = 200, message = "API가 정상적으로 Batch Job을 Call 하였음. 이후 상태는 Batch Metadata에서 확인 가능."),
+            @ApiResponse(code = 500, message = "Server Error.")
+    })
+    @PostMapping("/run/{jobName}")
+    public GlobalMessageDto batchStopper(@PathVariable("jobName") String jobName, @Valid @RequestBody BatchParam batchParam) {
         // Validation Job
         if(!jobExplorer.getJobNames().contains(jobName)) return new GlobalMessageDto(false, "JOB_NAME[" + jobName + "] Not Found.");
 

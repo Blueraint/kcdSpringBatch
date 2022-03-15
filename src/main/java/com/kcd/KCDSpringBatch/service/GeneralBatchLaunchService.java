@@ -14,7 +14,10 @@ import org.springframework.batch.core.JobParameters;
 import org.springframework.batch.core.JobParametersBuilder;
 import org.springframework.batch.core.JobParametersInvalidException;
 import org.springframework.batch.core.configuration.JobLocator;
+import org.springframework.batch.core.launch.JobExecutionNotRunningException;
+import org.springframework.batch.core.launch.JobOperator;
 import org.springframework.batch.core.launch.NoSuchJobException;
+import org.springframework.batch.core.launch.NoSuchJobExecutionException;
 import org.springframework.batch.core.launch.support.SimpleJobLauncher;
 import org.springframework.batch.core.repository.JobExecutionAlreadyRunningException;
 import org.springframework.batch.core.repository.JobInstanceAlreadyCompleteException;
@@ -37,6 +40,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class GeneralBatchLaunchService {
     private final JobLocator jobLocator;
+    private final JobOperator jobOperator;
     private final BasicBatchConfigurer basicBatchConfigurer;
     private final ApplicationContext ctx;
     private final ObjectMapper objectMapper;
@@ -44,17 +48,15 @@ public class GeneralBatchLaunchService {
 
     public void runJob(String jobName, BatchParam batchParam) {
         /* Get batchJob Configuration(Bean) */
-        Job currentJob = ctx.getBean(jobName, Job.class);
+//        Job currentJob = ctx.getBean(jobName, Job.class);
 
         /* Get batchJob Configuration(JobLocator) */
-        /*
         Job currentJob = null;
         try {
             currentJob = jobLocator.getJob(jobName);
         } catch (NoSuchJobException e) {
             e.printStackTrace();
         }
-        */
 
         SimpleJobLauncher jobLauncher = (SimpleJobLauncher) basicBatchConfigurer.getJobLauncher();
         jobLauncher.setTaskExecutor(new SimpleAsyncTaskExecutor());
@@ -70,7 +72,16 @@ public class GeneralBatchLaunchService {
         } catch (JobParametersInvalidException e) {
             e.printStackTrace();
         }
+    }
 
+    public void stopJob(long id) {
+        try {
+            jobOperator.stop(id);
+        } catch (NoSuchJobExecutionException e) {
+            e.printStackTrace();
+        } catch (JobExecutionNotRunningException e) {
+            e.printStackTrace();
+        }
     }
 
     /*

@@ -3,6 +3,7 @@ package com.kcd.KCDSpringBatch.config;
 import com.kcd.KCDSpringBatch.dto.GlobalMessageDto;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -40,5 +41,13 @@ public class GlobalExceptionHandler {
         Map<String, String> errors = new HashMap<>();
 
         return new GlobalMessageDto(false, "Parameters Error. [" + exception.getParameterName() + "]");
+    }
+
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public GlobalMessageDto handleRequestParamExceptions(HttpRequestMethodNotSupportedException exception) {
+        Map<String, String> errors = new HashMap<>();
+
+        return new GlobalMessageDto(false, "Please right HTTP method. [" + exception.getMessage() + "]");
     }
 }
